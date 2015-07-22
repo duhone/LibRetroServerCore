@@ -18,9 +18,11 @@ namespace
 	public:
 		LibRetroCore(std::unique_ptr<CR::Platform::ISharedLibrary>&& a_core);
 		virtual ~LibRetroCore();
+		PixelFormat GetPixelformat() const override { return m_pixelFormat; }
 		bool OnRetroEnvironmentCmd(unsigned int cmd, void *data);
 	private:
 		bool OnEnvironmentSetVariables(void* data);
+		bool OnEnvironmentSetPixelFormat(void* data);
 
 		std::unique_ptr<CR::Platform::ISharedLibrary> m_coreLibrary;
 
@@ -37,6 +39,7 @@ namespace
 		std::function<bool(void* data)> m_onRetroEnvironmentCmd[40];
 
 		std::unordered_map<std::string, CoreOption> m_options;
+		PixelFormat m_pixelFormat{PixelFormat::XRGB8888};
 	};
 
 	LibRetroCore* g_libRetroCore = nullptr;
@@ -97,7 +100,8 @@ LibRetroCore::LibRetroCore(std::unique_ptr<CR::Platform::ISharedLibrary>&& a_cor
 	m_retroSetInputState = m_coreLibrary->GetStdFunction<void(retro_input_state_t)>("retro_set_input_state");
 
 	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_SET_VARIABLES] = [this](void* data) { return this->OnEnvironmentSetVariables(data); };
-
+	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_SET_PIXEL_FORMAT] = [this](void* data) { return this->OnEnvironmentSetPixelFormat(data); };
+	
 
 	m_retroSetEnvironment(retro_environment);
 	m_retroSetVideoRefresh(retro_video_refresh);
@@ -121,6 +125,24 @@ bool LibRetroCore::OnRetroEnvironmentCmd(unsigned cmd, void *data)
 	if(!m_onRetroEnvironmentCmd[cmd])
 		return false; //not a cmd we handle
 	return m_onRetroEnvironmentCmd[cmd](data);
+}
+
+bool LibRetroCore::OnEnvironmentSetPixelFormat(void* data)
+{
+	retro_pixel_format pixfmt = *(retro_pixel_format *)data;
+	switch(pixfmt)
+	{
+	case retro_pixel_format::RETRO_PIXEL_FORMAT_0RGB1555:
+		m_pixelFormat = PixelFormat::XRGB1555;
+		return true;
+	case retro_pixel_format::RETRO_PIXEL_FORMAT_RGB565:
+		m_pixelFormat = PixelFormat::RGB565;
+		return true;
+	case retro_pixel_format::RETRO_PIXEL_FORMAT_XRGB8888:
+		m_pixelFormat = PixelFormat::XRGB8888;
+		return true;
+	};
+	return false;
 }
 
 bool LibRetroCore::OnEnvironmentSetVariables(void* data)

@@ -4,7 +4,14 @@
 
 struct ILibRetroCore
 {
+	enum class PixelFormat
+	{
+		XRGB1555,
+		RGB565,
+		XRGB8888
+	};
 	virtual ~ILibRetroCore() = default;
+	virtual PixelFormat GetPixelformat() const = 0;
 };
 
 //This should only be called once. There can only be one core loaded at a time.
