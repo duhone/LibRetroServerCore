@@ -4,6 +4,7 @@
 #include <cassert>
 #include <unordered_map>
 #include <string>
+#include <Platform\MemoryMappedFile.h>
 
 namespace
 {
@@ -18,11 +19,17 @@ namespace
 	public:
 		LibRetroCore(std::unique_ptr<CR::Platform::ISharedLibrary>&& a_core);
 		virtual ~LibRetroCore();
+
 		PixelFormat GetPixelformat() const override { return m_pixelFormat; }
+		bool LoadGame(const char* a_gameFile) override;
+		void UnloadGame() override;
+
 		bool OnRetroEnvironmentCmd(unsigned int cmd, void *data);
 	private:
+		//Handlers for retro environment commands
 		bool OnEnvironmentSetVariables(void* data);
 		bool OnEnvironmentSetPixelFormat(void* data);
+		bool OnEnvironmentGetVariable(void* data);
 
 		std::unique_ptr<CR::Platform::ISharedLibrary> m_coreLibrary;
 
@@ -35,11 +42,17 @@ namespace
 		std::function<void(retro_audio_sample_batch_t)> m_retroSetAudioSampleBatch;
 		std::function<void(retro_input_poll_t)> m_retroSetInputPoll;
 		std::function<void(retro_input_state_t)> m_retroSetInputState;
+		std::function<void(retro_system_info*)> m_retroGetSystemInfo;
+		std::function<bool(const retro_game_info*)> m_retroLoadGame;
+		std::function<void()> m_retroUnloadGame;
 
 		std::function<bool(void* data)> m_onRetroEnvironmentCmd[40];
 
 		std::unordered_map<std::string, CoreOption> m_options;
 		PixelFormat m_pixelFormat{PixelFormat::XRGB8888};
+		retro_system_info m_retroSysInfo;
+		std::unique_ptr<CR::Platform::IMemoryMappedFile> m_gameMMap; //Docs not clear if we need to actually keep this around
+		bool m_gameLoaded{false};
 	};
 
 	LibRetroCore* g_libRetroCore = nullptr;
@@ -98,9 +111,16 @@ LibRetroCore::LibRetroCore(std::unique_ptr<CR::Platform::ISharedLibrary>&& a_cor
 	m_retroSetAudioSampleBatch = m_coreLibrary->GetStdFunction<void(retro_audio_sample_batch_t)>("retro_set_audio_sample_batch");
 	m_retroSetInputPoll = m_coreLibrary->GetStdFunction<void(retro_input_poll_t)>("retro_set_input_poll");
 	m_retroSetInputState = m_coreLibrary->GetStdFunction<void(retro_input_state_t)>("retro_set_input_state");
+	m_retroGetSystemInfo = m_coreLibrary->GetStdFunction<void(retro_system_info*)>("retro_get_system_info");
+	m_retroLoadGame = m_coreLibrary->GetStdFunction<bool(const retro_game_info*)>("retro_load_game");
+	m_retroUnloadGame = m_coreLibrary->GetStdFunction<void()>("retro_unload_game");
 
-	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_SET_VARIABLES] = [this](void* data) { return this->OnEnvironmentSetVariables(data); };
-	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_SET_PIXEL_FORMAT] = [this](void* data) { return this->OnEnvironmentSetPixelFormat(data); };
+	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_SET_VARIABLES] = [this](void* data) { 
+		return this->OnEnvironmentSetVariables(data); };
+	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_SET_PIXEL_FORMAT] = [this](void* data) { 
+		return this->OnEnvironmentSetPixelFormat(data); };
+	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_GET_VARIABLE] = [this](void* data) { 
+		return this->OnEnvironmentGetVariable(data); };
 	
 
 	m_retroSetEnvironment(retro_environment);
@@ -109,13 +129,15 @@ LibRetroCore::LibRetroCore(std::unique_ptr<CR::Platform::ISharedLibrary>&& a_cor
 	m_retroSetAudioSampleBatch(retro_audio_sample_batch);
 	m_retroSetInputPoll(retro_input_poll);
 	m_retroSetInputState(retro_input_state);
-	
+	m_retroGetSystemInfo(&m_retroSysInfo);
+
 	m_retroInit();
 }
 
 LibRetroCore::~LibRetroCore()
 {
 	assert(g_libRetroCore);
+	UnloadGame();
 	m_retroDeinit();
 	g_libRetroCore = nullptr;
 }
@@ -145,6 +167,16 @@ bool LibRetroCore::OnEnvironmentSetPixelFormat(void* data)
 	return false;
 }
 
+bool LibRetroCore::OnEnvironmentGetVariable(void* data)
+{
+	retro_variable* variable = (retro_variable*)data;
+	variable->value = nullptr;
+	auto optionIter = m_options.find(variable->key);
+	if(optionIter != end(m_options))
+		variable->value = optionIter->second.Options[optionIter->second.CurrentOption].c_str();
+	return true;
+}
+
 bool LibRetroCore::OnEnvironmentSetVariables(void* data)
 {
 	const retro_variable* variables = (const retro_variable*)data;
@@ -167,6 +199,39 @@ bool LibRetroCore::OnEnvironmentSetVariables(void* data)
 		++variables;
 	}
 	return true;
+}
+
+bool LibRetroCore::LoadGame(const char* a_gameFile)
+{
+	retro_game_info gameInfo;
+	if(m_retroSysInfo.need_fullpath)
+	{
+		gameInfo.path = a_gameFile;
+		gameInfo.data = nullptr;
+		gameInfo.size = 0;
+		gameInfo.meta = nullptr;
+	}
+	else
+	{
+		m_gameMMap = CR::Platform::OpenMMapFile(a_gameFile);
+		gameInfo.path = a_gameFile;
+		gameInfo.data = m_gameMMap->data();
+		gameInfo.size = m_gameMMap->size();;
+		gameInfo.meta = nullptr;
+	}
+
+	m_gameLoaded = m_retroLoadGame(&gameInfo);
+	return m_gameLoaded;
+}
+
+void LibRetroCore::UnloadGame()
+{
+	if(m_gameLoaded)
+	{
+		m_retroUnloadGame();
+		m_gameMMap.reset(nullptr);
+		m_gameLoaded = false;
+	}
 }
 
 std::unique_ptr<ILibRetroCore> LoadCore(const char* a_coreName)
