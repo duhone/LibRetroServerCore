@@ -23,6 +23,7 @@ namespace
 		PixelFormat GetPixelformat() const override { return m_pixelFormat; }
 		bool LoadGame(const char* a_gameFile) override;
 		void UnloadGame() override;
+		void RunOneFrame() override;
 
 		bool OnRetroEnvironmentCmd(unsigned int cmd, void *data);
 	private:
@@ -45,6 +46,7 @@ namespace
 		std::function<void(retro_system_info*)> m_retroGetSystemInfo;
 		std::function<bool(const retro_game_info*)> m_retroLoadGame;
 		std::function<void()> m_retroUnloadGame;
+		std::function<void()> m_retroRun;
 
 		std::function<bool(void* data)> m_onRetroEnvironmentCmd[40];
 
@@ -60,8 +62,7 @@ namespace
 	//have to pass to a lib retro core, no idea what its for
 	bool retro_environment(unsigned cmd, void *data)
 	{
-		data;
-		std::cout << "retro_environment " << cmd << std::endl;	
+		//std::cout << "retro_environment " << cmd << std::endl;	
 		assert(g_libRetroCore);
 		return g_libRetroCore->OnRetroEnvironmentCmd(cmd, data);
 	}
@@ -69,30 +70,31 @@ namespace
 	void retro_video_refresh(const void *data, unsigned width, unsigned height, size_t pitch)
 	{
 		data;
-		std::cout << "retro_video_refresh " << width << height << pitch << std::endl;
+		std::cout << "retro_video_refresh width" << width << " height" << height << " pitch" << pitch << std::endl;
 	}
 	
 	void retro_audio_sample(int16_t left, int16_t right)
 	{
-		std::cout << "retro_audio_sample " << left << right << std::endl;
+		std::cout << "retro_audio_sample left" << left << " right" << right << std::endl;
 	}
 
 	//l and r are interleaved
 	size_t retro_audio_sample_batch(const int16_t *data, size_t frames)
 	{
 		data;
-		std::cout << "retro_audio_sample_batch " << frames << std::endl;
+		std::cout << "retro_audio_sample_batch frames" << frames << std::endl;
 		return 0;
 	}
 
 	void retro_input_poll(void)
 	{
-		std::cout << "retro_input_poll " << std::endl;
+		//std::cout << "retro_input_poll " << std::endl;
 	}
 
 	int16_t retro_input_state(unsigned port, unsigned device, unsigned index, unsigned id)
 	{
-		std::cout << "retro_input_state " << port << device << index << id << std::endl;
+		port; device; index; id;
+		//std::cout << "retro_input_state port" << port << " device" << device << " index" << index << " id" << id << std::endl;
 		return 0;
 	}
 }
@@ -114,6 +116,7 @@ LibRetroCore::LibRetroCore(std::unique_ptr<CR::Platform::ISharedLibrary>&& a_cor
 	m_retroGetSystemInfo = m_coreLibrary->GetStdFunction<void(retro_system_info*)>("retro_get_system_info");
 	m_retroLoadGame = m_coreLibrary->GetStdFunction<bool(const retro_game_info*)>("retro_load_game");
 	m_retroUnloadGame = m_coreLibrary->GetStdFunction<void()>("retro_unload_game");
+	m_retroRun = m_coreLibrary->GetStdFunction<void()>("retro_run");
 
 	m_onRetroEnvironmentCmd[RETRO_ENVIRONMENT_SET_VARIABLES] = [this](void* data) { 
 		return this->OnEnvironmentSetVariables(data); };
@@ -232,6 +235,11 @@ void LibRetroCore::UnloadGame()
 		m_gameMMap.reset(nullptr);
 		m_gameLoaded = false;
 	}
+}
+
+void LibRetroCore::RunOneFrame()
+{
+	m_retroRun();
 }
 
 std::unique_ptr<ILibRetroCore> LoadCore(const char* a_coreName)

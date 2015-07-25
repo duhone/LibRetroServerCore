@@ -14,6 +14,7 @@ struct ILibRetroCore
 	virtual PixelFormat GetPixelformat() const = 0;
 	virtual bool LoadGame(const char* a_gameFile) = 0;
 	virtual void UnloadGame() = 0;
+	virtual void RunOneFrame() = 0;
 };
 
 //This should only be called once. There can only be one core loaded at a time.
