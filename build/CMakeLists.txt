@@ -7,12 +7,15 @@ include_directories("${PROJECT_SOURCE_DIR}/../../3rdParty/libretro")
 include_directories("${PROJECT_SOURCE_DIR}/../../core/inc")
 include_directories("${PROJECT_SOURCE_DIR}/../../Platform/inc")
 
+include_directories("${PROJECT_SOURCE_DIR}/../inc/LibRetroServer")
 
 ###############################################
 #exe
 ###############################################
+file(GLOB_RECURSE lrc_inc "${PROJECT_SOURCE_DIR}/../inc/*.h")
 file(GLOB_RECURSE lrc_src1 "${PROJECT_SOURCE_DIR}/../src/*.h")
 file(GLOB_RECURSE lrc_src2 "${PROJECT_SOURCE_DIR}/../src/*.cpp")
+list(APPEND lrc_src ${lrc_inc})
 list(APPEND lrc_src ${lrc_src1})
 list(APPEND lrc_src ${lrc_src2})
 
