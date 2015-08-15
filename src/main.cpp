@@ -49,13 +49,16 @@ void OnPipeMessage(void* a_msg, size_t a_msgSize)
 int _tmain(int argc, _TCHAR* argv[])
 {
 	//we require getting the name of our pipe on the commandline
-	if(argc < 2)
+	if(argc != 1 || strlen(argv[0]) != 32)
 		return 1;
 
-	auto pipeClient = Platform::CreatePipeClient(argv[1], OnPipeMessage);
+	std::string pipeName{R"(\\.\pipe\)"};
+	pipeName += argv[0];
+	auto pipeClient = Platform::CreatePipeClient(pipeName.c_str(), OnPipeMessage);
 	if(!pipeClient)
 		return 1;
 
+	pipeClient->SendPipeMessage(Messages::CoreAcceptingMsgsMessage{});
 	std::unique_lock<std::mutex> initLock(g_initializedMutex);
 	g_initializedCondition.wait(initLock, []() { return g_initialized; });
 			

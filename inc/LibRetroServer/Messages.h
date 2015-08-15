@@ -10,6 +10,7 @@ namespace CR
 			{
 				Initialize,
 				Shutdown,
+				CoreAcceptingMsgs,
 				NumMessages
 			};
 
@@ -20,6 +21,11 @@ namespace CR
 				char GamePath[255];
 			};
 			
+			struct CoreAcceptingMsgsMessage
+			{
+				MessageTypeT MessageType{CoreAcceptingMsgs};
+			};
+
 			struct ShutdownMessage
 			{
 				MessageTypeT MessageType{Shutdown};
