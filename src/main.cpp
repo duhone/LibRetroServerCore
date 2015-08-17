@@ -40,10 +40,13 @@ std::function<void(void*, size_t)> g_msgHandlers[] = {OnInitializeMsg, OnShutdow
 
 void OnPipeMessage(void* a_msg, size_t a_msgSize)
 {
-	assert(a_msgSize >= sizeof(Messages::MessageTypeT));
-	auto msgType = (Messages::MessageTypeT*)a_msg;
-	assert(*msgType < Messages::NumMessages);
-	g_msgHandlers[*msgType](a_msg, a_msgSize);
+	assert(a_msgSize >= sizeof(Messages::ServerMessageTypeT));
+	auto msgType = (Messages::ServerMessageTypeT*)a_msg;
+	static_assert(Messages::NumServerMessages == sizeof(g_msgHandlers) / sizeof(std::function<void(void*, size_t)>), 
+				  "incorrect number of msg handlers");
+	assert(*msgType < Messages::NumServerMessages);
+	if(g_msgHandlers[*msgType])
+		g_msgHandlers[*msgType](a_msg, a_msgSize);
 }
 
 int _tmain(int argc, _TCHAR* argv[])

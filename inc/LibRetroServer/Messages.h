@@ -6,29 +6,34 @@ namespace CR
 	{
 		namespace Messages
 		{
-			enum MessageTypeT
+			enum ServerMessageTypeT
 			{
 				Initialize,
 				Shutdown,
+				NumServerMessages
+			};
+
+			enum ClientMessageTypeT
+			{
 				CoreAcceptingMsgs,
-				NumMessages
+				NumClientMessages
 			};
 
 			struct InitializeMessage
 			{
-				MessageTypeT MessageType{Initialize};
+				ServerMessageTypeT MessageType{Initialize};
 				char CorePath[255];
 				char GamePath[255];
-			};
-			
-			struct CoreAcceptingMsgsMessage
-			{
-				MessageTypeT MessageType{CoreAcceptingMsgs};
 			};
 
 			struct ShutdownMessage
 			{
-				MessageTypeT MessageType{Shutdown};
+				ServerMessageTypeT MessageType{Shutdown};
+			};
+			
+			struct CoreAcceptingMsgsMessage
+			{
+				ClientMessageTypeT MessageType{CoreAcceptingMsgs};
 			};
 		}
 	}
