@@ -55,6 +55,10 @@ namespace
 		retro_system_info m_retroSysInfo;
 		std::unique_ptr<CR::Platform::IMemoryMappedFile> m_gameMMap; //Docs not clear if we need to actually keep this around
 		bool m_gameLoaded{false};
+
+		int m_width;
+		int m_height;
+		int m_pitch;
 	};
 
 	LibRetroCore* g_libRetroCore = nullptr;
